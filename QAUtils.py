@@ -6,6 +6,7 @@ import time
 import datetime
 import re
 from tqdm import tqdm
+import difflib
 
 class LessonQA:
     
@@ -52,6 +53,45 @@ class LessonQA:
             str_QA += '\n'
             
         return str_QA
+
+    def get_QAs(self, lesson_dialogue_pd):
+        pattern = re.compile("(?<=<blockquote>)[\s\S]*(?=</blockquote>)")
+        father_id_list = []
+        content_list = []
+        qa_diaglog = []
+        data_list = lesson_dialogue_pd.values
+        for index, line in enumerate(data_list):
+            content = line[-2]
+            isQues = line[-1]
+            id = line[0]
+            searchobj = pattern.search(content)
+            father_id = -1
+            last_content = ''
+            if searchobj:
+                quotetr = searchobj.group()
+                quotetr = quotetr.replace('<p></p>', '')
+                for last in range(index-1,-1,-1):
+                    last_item = data_list[last]
+                    last_content = last_item[-2]
+                    last_isQues = last_item[-1]
+                    last_id = last_item[0]
+                    seq = difflib.SequenceMatcher(None, quotetr, last_content)
+                    ratio = seq.ratio()
+                    if ratio > 0.8:
+                        father_id = last_id
+                        break
+                quotetr = '<blockquote>' + quotetr + '</blockquote>'
+                content = content.replace(quotetr, '')
+            
+            if not isQues:
+                qa_item = []
+                qa_item.append(father_id)
+                qa_item.append(id)
+                qa_item.append(last_content)
+                qa_item.append(content)
+                qa_diaglog.append(qa_item)
+        return qa_diaglog
+
 
 
 class CodeQA:
@@ -158,3 +198,27 @@ class CodeQA:
             
         return str_QA
 
+    def get_QAs(self, test_reviews_pd):
+        test_reviews = test_reviews_pd.values
+        now_commit_id = ''
+        last_is_ques = True
+        qa_list = []
+        for index, line in enumerate(test_reviews):
+            commit_id = line[1]
+            isQus = line[-2]
+            id = line[0]
+            content = line[-4]
+            if commit_id != now_commit_id:
+                now_commit_id = commit_id
+            else:
+                if (not isQus) and last_is_ques:
+                    qa_temp = []
+                    qa_temp.append(last_id)
+                    qa_temp.append(id)
+                    qa_temp.append(last_content)
+                    qa_temp.append(content)
+                    qa_list.append(qa_temp)
+            last_is_ques = isQus
+            last_id = id
+            last_content = content
+        return qa_list
