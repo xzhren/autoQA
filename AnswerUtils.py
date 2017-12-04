@@ -107,6 +107,7 @@ class CodeQA:
         self.reivews_df['testId'] = self.reivews_df.apply(lambda line: self.testid_commitid_dict[line[1]], axis=1)
         self.reivews_df['isQues'] = self.reivews_df.apply(lambda line: line[2] == line[3], axis=1)
         self.reivews_df = self.reivews_df.sort_values(by=['createdTime'], ascending=True)
+        self.merge_test_info = pd.merge(self.tests_result_df.drop(['id'], axis=1), self.tests_df, left_on='testId', right_on='id', how="inner")
         
     def _load_data(self):
         reivews_df = pd.read_csv("./data/reivews_df.csv")
@@ -117,6 +118,7 @@ class CodeQA:
 
     def _get_keys(self):
         codeQA_keys = self.tests_df[['course','lesson','question']].drop_duplicates()
+        codeQA_keys = codeQA_keys.sort_values(['lesson'])
         return codeQA_keys
 
     def _get_testid_commitid_dict(self):
@@ -159,49 +161,66 @@ class CodeQA:
     def get_key_by_index(self, index):
         return self.codeQA_keys.iloc[index:index+1]
 
-    def get_key_by_range(self, min, max):
-        return self.codeQA_keys.iloc[min:max+1]
+    # def get_key_by_range(self, min, max):
+    #     return self.codeQA_keys.iloc[min:max+1]
 
-    def get_test_info_by_key(self, codeQA_key):
-        test_info_pd = pd.merge(self.tests_df, codeQA_key, how="inner")
-        return test_info_pd
+    # def get_test_info_by_key(self, codeQA_key):
+    #     test_info_pd = pd.merge(self.tests_df, codeQA_key, how="inner")
+    #     return test_info_pd
 
-    def get_test_info_by_testid(self, codeQA_key):
-        test_info_pd = pd.merge(self.tests_df, codeQA_key, left_on='id', right_on='testId', how="inner")
-        return test_info_pd
+    # def get_test_info_by_testid(self, codeQA_key):
+    #     test_info_pd = pd.merge(self.tests_df, codeQA_key, left_on='id', right_on='testId', how="inner")
+    #     return test_info_pd
 
-    def get_test_result_by_testid(self, test_info_pd):
-        test_result_pd = pd.merge(self.tests_result_df, test_info_pd[['id']], left_on='testId', right_on='id', how="inner")
-        return test_result_pd
+    # def get_test_result_by_testid(self, test_info_pd):
+    #     test_result_pd = pd.merge(self.tests_result_df, test_info_pd[['id']], left_on='testId', right_on='id', how="inner")
+    #     return test_result_pd
 
     def get_reviews_by_key(self, codeQA_key):
         test_info_pd = pd.merge(self.tests_df, codeQA_key, how="inner")
         test_info_pd['testId'] = test_info_pd['id']
         test_reviews_pd = pd.merge(self.reivews_df, test_info_pd[['testId']], left_on='testId', right_on='testId', how="inner")
-        commitid_testid_pd = test_reviews_pd[['commitId','testId']].drop_duplicates()
+        # commitid_testid_pd = test_reviews_pd[['commitId','testId']].drop_duplicates()
         # commitid_testid_pd['id'] = commitid_testid_pd['testId']
-        return test_reviews_pd, commitid_testid_pd
+        return test_reviews_pd
+        # return test_reviews_pd, commitid_testid_pd
 
-    def pprint_code_QA(self, test_reviews_pd):
-        str_QA = ''
-        now_commit_id = ''
-        for line in test_reviews_pd.values:
-            if line[1] != now_commit_id:
-                str_QA += '\n' + line[1] + '\n'
-                now_commit_id = line[1] 
-            str_QA += datetime.datetime.fromtimestamp(
-                int(line[-5]//1000)
-            ).strftime('%Y-%m-%d %H:%M:%S')
+    def get_answers_by_reviews(self, test_reviews_pd):
+        answer_df = test_reviews_pd[test_reviews_pd.isQues == False][['testId','commitId','content']]
+        answer_df = answer_df.drop_duplicates(['content'])
+        return answer_df
+
+    def get_questions_by_reviews(self, test_reviews_pd):
+        answer_df = test_reviews_pd[test_reviews_pd.isQues == True][['testId','commitId','content']]
+        answer_df = answer_df.drop_duplicates(['content'])
+        return answer_df
+
+    def get_testinfo_by_testid(self, codeQA_key):
+        test_info_pd = pd.merge(self.tests_df, codeQA_key, how="inner")
+        test_reviews_pd = pd.merge(self.merge_test_info.drop(['id'], axis=1), test_info_pd[['id']], left_on='testId', right_on='id', how="inner")
+        return test_reviews_pd
+
+
+    # def pprint_code_QA(self, test_reviews_pd):
+    #     str_QA = ''
+    #     now_commit_id = ''
+    #     for line in test_reviews_pd.values:
+    #         if line[1] != now_commit_id:
+    #             str_QA += '\n' + line[1] + '\n'
+    #             now_commit_id = line[1] 
+    #         str_QA += datetime.datetime.fromtimestamp(
+    #             int(line[-5]//1000)
+    #         ).strftime('%Y-%m-%d %H:%M:%S')
             
-            if line[-2]: str_QA += ' Q：'
-            else: str_QA += ' A：'
+    #         if line[-2]: str_QA += ' Q：'
+    #         else: str_QA += ' A：'
                 
-            str_QA += line[2]
-            str_QA += ' '
-            str_QA += line[-4]
-            str_QA += '\n'
+    #         str_QA += line[2]
+    #         str_QA += ' '
+    #         str_QA += line[-4]
+    #         str_QA += '\n'
             
-        return str_QA
+    #     return str_QA
 
     def get_QAs(self, test_reviews_pd):
         test_reviews = test_reviews_pd.values
